@@ -17,6 +17,8 @@ import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.util.DriveFeedforwards;
 import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
+
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import org.json.simple.parser.ParseException;
+import org.photonvision.EstimatedRobotPose;
 import org.photonvision.targeting.PhotonPipelineResult;
 import swervelib.SwerveController;
 import swervelib.SwerveDrive;
@@ -55,6 +58,11 @@ import swervelib.telemetry.SwerveDriveTelemetry.TelemetryVerbosity;
 
 public class SwerveSubsystem extends SubsystemBase
 {
+  //TODO javadoc
+  private final PIDController drivePid = new PIDController(0, 0, 0);
+  private Pose2d desiredPose;
+  private Translation2d translation;
+  private double angVel;
 
   /**
    * Swerve drive object.
@@ -144,6 +152,14 @@ public class SwerveSubsystem extends SubsystemBase
       swerveDrive.updateOdometry();
       vision.updatePoseEstimation(swerveDrive);
     }
+
+    // Update Translation to some point
+    // TODO: Change 0, 0, 0 to diff values
+    translation = new Translation2d(
+            swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getX(), swerveDrive.getPose().getX()),
+            swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getY(), swerveDrive.getPose().getY())
+    );
+    angVel = swerveDrive.getMaximumModuleAngleVelocity().times(drivePid.calculate(swerveDrive.getPose().getRotation().getRotations(), desiredPose.getRotation().getRotations())).magnitude();
   }
 
   @Override
@@ -729,5 +745,13 @@ public class SwerveSubsystem extends SubsystemBase
   public SwerveDrive getSwerveDrive()
   {
     return swerveDrive;
+  }
+
+  //TODO: Javadoc
+  public void DriveToPoint(Pose2d desiredPose)
+  {
+    this.desiredPose = desiredPose;
+
+    this.drive(translation, angVel, true);
   }
 }
