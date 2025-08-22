@@ -27,6 +27,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -43,6 +44,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
+
+import frc.robot.utils.NetworkTablesUtils;
 import org.json.simple.parser.ParseException;
 import org.photonvision.EstimatedRobotPose;
 import org.photonvision.targeting.PhotonPipelineResult;
@@ -60,9 +63,7 @@ public class SwerveSubsystem extends SubsystemBase
 {
   //TODO javadoc
   private final PIDController drivePid = new PIDController(0, 0, 0);
-  private Pose2d desiredPose;
-  private Translation2d translation;
-  private double angVel;
+  private final NetworkTablesUtils table = NetworkTablesUtils.getTable("debug");
 
   /**
    * Swerve drive object.
@@ -155,11 +156,9 @@ public class SwerveSubsystem extends SubsystemBase
 
     // Update Translation to some point
     // TODO: Change 0, 0, 0 to diff values
-    translation = new Translation2d(
-            swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getX(), swerveDrive.getPose().getX()),
-            swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getY(), swerveDrive.getPose().getY())
-    );
-    angVel = swerveDrive.getMaximumModuleAngleVelocity().times(drivePid.calculate(swerveDrive.getPose().getRotation().getRotations(), desiredPose.getRotation().getRotations())).magnitude();
+    table.setEntry("GoToX", swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getX(), table.getEntry("DesiredX", 0)));
+    table.setEntry("GoToY", swerveDrive.getMaximumChassisVelocity() * drivePid.calculate(swerveDrive.getPose().getY(), table.getEntry("DesiredY", 0)));
+    table.setEntry("GoToAng", swerveDrive.getMaximumChassisAngularVelocity() * drivePid.calculate(swerveDrive.getPose().getRotation().getRotations(), table.getEntry("DesiredAng", 0)));
   }
 
   @Override
@@ -750,8 +749,16 @@ public class SwerveSubsystem extends SubsystemBase
   //TODO: Javadoc
   public void DriveToPoint(Pose2d desiredPose)
   {
-    this.desiredPose = desiredPose;
+    table.setEntry("DesiredX", desiredPose.getX());
+    table.setEntry("DesiredY", desiredPose.getY());
+    table.setEntry("DesiredAng", desiredPose.getRotation().getRotations());
 
-    this.drive(translation, angVel, true);
+    this.drive(
+            new Translation2d(
+                table.getEntry("GoToX", 0),
+                table.getEntry("GoToY", 0)),
+            table.getEntry("GoToAng", 0),
+            true
+    );
   }
 }
